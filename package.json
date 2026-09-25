@@ -1,0 +1,42 @@
+{
+  "name": "dsh-web-search-ddgs",
+  "version": "0.1.0",
+  "description": "DDGS/DuckDuckGo search provider for DeepSeek Harness ctx.web, no search API key required.",
+  "license": "MIT",
+  "type": "module",
+  "main": "./lib/index.js",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./lib/index.js"
+    },
+    "./src/*": "./src/*",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib/index.js",
+    "lib/ddgs_worker.py",
+    "src/index.ts",
+    "cordis.patch.yml",
+    "README.md",
+    "LICENSE"
+  ],
+  "keywords": [
+    "deepseek-harness",
+    "dsh",
+    "plugin",
+    "web-search",
+    "duckduckgo",
+    "ddgs"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "*",
+    "@deepseek-ai/dsh-web": "*"
+  }
+}

@@ -1,0 +1,8 @@
+- id: web
+  name: '@deepseek-ai/dsh-web'
+  config:
+    searchProvider: ddgs
+
+- insert:
+    - id: web-search-ddgs
+      name: dsh-web-search-ddgs
