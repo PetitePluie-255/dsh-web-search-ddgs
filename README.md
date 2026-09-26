@@ -13,7 +13,13 @@ From a source checkout of DeepSeek Harness:
 
 ```bash
 cd /path/to/deepseek-harness
-pnpm dsh plugin --profile web add github:YOUR_GITHUB_USER/dsh-web-search-ddgs
+pnpm dsh plugin --profile web add github:PetitePluie-255/dsh-web-search-ddgs
+```
+
+To pin the published version:
+
+```bash
+pnpm dsh plugin --profile web add github:PetitePluie-255/dsh-web-search-ddgs#v0.1.1
 ```
 
 For local development before publishing:
@@ -21,6 +27,13 @@ For local development before publishing:
 ```bash
 cd /path/to/deepseek-harness
 pnpm dsh plugin --profile web add /absolute/path/to/dsh-web-search-ddgs
+```
+
+Build and test the package before installing a local checkout:
+
+```bash
+pnpm install
+pnpm test
 ```
 
 Then start the WebUI:
@@ -39,6 +52,10 @@ Install `ddgs` for the Python used by DSH:
 ```bash
 python3 -m pip install ddgs
 ```
+
+The plugin checks once at startup that the selected Python executable can
+`import ddgs`. If the check fails, DSH reports the configured search provider
+as unavailable instead of waiting for the first search request to fail.
 
 Or point the plugin at a specific Python executable:
 
@@ -86,6 +103,10 @@ Optional plugin config:
     timeoutMs: 20000
     backend: auto
 ```
+
+`maxResults` must be an integer from 1 through 10. `timeoutMs` must be an
+integer from 1 through 120000. Empty `pythonBin` and `backend` values are
+rejected when the profile is loaded.
 
 ## Notes
 

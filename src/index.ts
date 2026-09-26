@@ -9,9 +9,11 @@
  * @module dsh-web-search-ddgs
  */
 
-import { spawn } from 'node:child_process'
+import { spawn, spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import type { Context } from '@deepseek-ai/cordis'
+import z from '@deepseek-ai/schemastery'
+import { WebError } from '@deepseek-ai/dsh-web'
 import type { WebSearchProvider, WebSearchRequest, WebSearchResult, WebSearchSource } from '@deepseek-ai/dsh-web'
 
 export const name = 'web-search-ddgs'
@@ -23,6 +25,8 @@ export const DEFAULT_TIMEOUT_MS = 20_000
 export const DEFAULT_BACKEND = 'auto'
 export const MAX_QUERY_CHARS = 300
 export const MAX_RESULTS_CAP = 10
+export const MAX_TIMEOUT_MS = 120_000
+export const PREFLIGHT_TIMEOUT_MS = 5_000
 
 const WORKER_PATH = fileURLToPath(new URL('../lib/ddgs_worker.py', import.meta.url))
 
@@ -37,7 +41,15 @@ export interface Config {
   backend?: string
 }
 
-interface ResolvedConfig {
+/** Runtime validation for plugin configuration loaded from Cordis YAML. */
+export const Config: z<Config> = z.object({
+  pythonBin: z.string().min(1),
+  maxResults: z.number().step(1).min(1).max(MAX_RESULTS_CAP),
+  timeoutMs: z.number().step(1).min(1).max(MAX_TIMEOUT_MS),
+  backend: z.string().min(1),
+})
+
+export interface DdgsSearchProviderOptions {
   pythonBin: string
   maxResults: number
   timeoutMs: number
@@ -50,18 +62,13 @@ interface WorkerPayload {
   error?: { code?: string, message?: string }
 }
 
-export class DdgsWebError extends Error {
-  constructor(message: string, readonly code: string, options?: ErrorOptions) {
-    super(message, options)
-    this.name = 'WebError'
-  }
-}
+export class DdgsWebError extends WebError {}
 
-function resolveConfig(config: Config): ResolvedConfig {
+function resolveConfig(config: Config): DdgsSearchProviderOptions {
   return {
     pythonBin: config.pythonBin ?? process.env.DSH_DDGS_PYTHON ?? 'python3',
     maxResults: clampPositiveInteger(config.maxResults, DEFAULT_MAX_RESULTS, MAX_RESULTS_CAP),
-    timeoutMs: clampPositiveInteger(config.timeoutMs, DEFAULT_TIMEOUT_MS, 120_000),
+    timeoutMs: clampPositiveInteger(config.timeoutMs, DEFAULT_TIMEOUT_MS, MAX_TIMEOUT_MS),
     backend: config.backend ?? DEFAULT_BACKEND,
   }
 }
@@ -73,11 +80,15 @@ function clampPositiveInteger(value: number | undefined, fallback: number, cap: 
 
 export class DdgsSearchProvider implements WebSearchProvider {
   readonly id = DDGS_PROVIDER_ID
+  private readonly runtimeAvailable: boolean
 
-  constructor(private readonly options: ResolvedConfig) {}
+  constructor(private readonly options: DdgsSearchProviderOptions) {
+    this.runtimeAvailable = canImportDdgs(options.pythonBin)
+  }
 
   available(): boolean {
-    return this.options.pythonBin.length > 0
+    return this.runtimeAvailable
+      && this.options.pythonBin.length > 0
       && this.options.maxResults > 0
       && this.options.timeoutMs > 0
   }
@@ -112,6 +123,15 @@ export class DdgsSearchProvider implements WebSearchProvider {
       truncated: (payload.results?.length ?? 0) > maxResults,
     }
   }
+}
+
+function canImportDdgs(pythonBin: string): boolean {
+  if (pythonBin.length === 0) return false
+  const result = spawnSync(pythonBin, ['-c', 'import ddgs'], {
+    stdio: 'ignore',
+    timeout: PREFLIGHT_TIMEOUT_MS,
+  })
+  return result.status === 0 && result.error === undefined
 }
 
 function runWorker(pythonBin: string, request: object, timeoutMs: number, signal?: AbortSignal): Promise<WorkerPayload> {
